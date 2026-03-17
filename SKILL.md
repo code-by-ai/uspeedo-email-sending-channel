@@ -40,6 +40,8 @@ credentials_note: "Supplied via environment variables (preferred) or per request
 - When the user asks the Agent to "send email" or "send an email"
 - When the user provides recipients, email content, and is willing to provide uSpeedo platform keys
 
+When asking the user to provide or confirm any send parameters (recipients, sender, subject, content, credentials), **always show the guidance in "Notes for Users"** (ACCESSKEY_ID/ACCESSKEY_SECRET obtain link and deliverability/domain link).
+
 ## Prerequisites
 
 1. **Registration**: The user has registered an account at [uSpeedo](https://uspeedo.com?SaleCode=UI2346).
@@ -155,7 +157,9 @@ curl -X POST "https://api.uspeedo.com/api/v1/email/SendEmail" \
 3. Call `POST https://api.uspeedo.com/api/v1/email/SendEmail` with Basic authentication.
 4. Report only the user-safe outcome to the user (see "Reporting API Response to the User" above); do not echo raw response bodies that may contain sensitive data.
 
+**When prompting the user to provide or confirm send parameters**, always include the guidance below (see "Notes for Users"). Show these hints every time you ask for recipient, sender, subject, content, or credentials.
+
 ## Notes for Users
 
-- **Sender**: The sender email address must be configured in the uSpeedo platform before use.
-- **Deliverability**: For better deliverability, the sender must authenticate the sending domain (add DNS records and verify the domain in the uSpeedo console).
+- **ACCESSKEY_ID and ACCESSKEY_SECRET**: Obtain from [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys).
+- **Deliverability**: For better sending results, configure your own sending domain: [Domain setting](https://console.uspeedo.com/email/setting?type=domain).
