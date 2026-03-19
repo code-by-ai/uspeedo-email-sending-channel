@@ -33,8 +33,8 @@ echo -n 'ACCESSKEY_ID:ACCESSKEY_SECRET' | base64
 
 ## User Prerequisites
 
-1. Open [uSpeedo](https://uspeedo.com?SaleCode=UI2346) and register an account.
-2. Create or view an AccessKey at [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys&SaleCode=UI2346) and note the ID and Secret.
+1. Open [uSpeedo](https://uspeedo.com?ChannelCode=OpenClaw) and register an account.
+2. Create or view an AccessKey at [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys&ChannelCode=OpenClaw) and note the ID and Secret.
 3. Provide these keys to the Agent (or configure them securely) for calling the SendEmail API.
 
 **Usage restriction**: Do not cache or persist ACCESSKEY_ID and ACCESSKEY_SECRET; they are for the current request only and must not be retained after use.

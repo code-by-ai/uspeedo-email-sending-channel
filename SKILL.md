@@ -1,7 +1,7 @@
 ---
 name: uspeedo-email-sending-channel
 description: Sends email via uSpeedo's sending channel (platform API with verified/parsed domain), not via the user's own mailbox or SMTP. Use when the user asks the Agent to send email. Requires message content (text or HTML), platform keys (ACCESSKEY_ID, ACCESSKEY_SECRET), sender and recipients; user must register on uSpeedo and obtain keys first.
-homepage: https://uspeedo.com/?SaleCode=UI2346
+homepage: https://uspeedo.com/?ChannelCode=OpenClaw
 environment_variables:
   - ACCESSKEY_ID
   - ACCESSKEY_SECRET
@@ -29,7 +29,7 @@ credentials_note: "Supplied via environment variables (preferred) or per request
 | ACCESSKEY_ID     | Yes | uSpeedo API Basic auth (ID) |
 | ACCESSKEY_SECRET | Yes | uSpeedo API Basic auth (Secret) |
 
-**Obtaining environment variables (ACCESSKEY_ID / ACCESSKEY_SECRET)**: Go to [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys&SaleCode=UI2346) to create or view API keys, and set them in `.env` or your system environment (see `.env.example` in this skill directory). If both environment variables and user-provided keys are present, **environment variables take precedence**. Keys are for authenticating the current request only; do not cache or persist them, and do not commit `.env` to version control.
+**Obtaining environment variables (ACCESSKEY_ID / ACCESSKEY_SECRET)**: Go to [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys&ChannelCode=OpenClaw) to create or view API keys, and set them in `.env` or your system environment (see `.env.example` in this skill directory). If both environment variables and user-provided keys are present, **environment variables take precedence**. Keys are for authenticating the current request only; do not cache or persist them, and do not commit `.env` to version control.
 
 ## Usage Restrictions (Mandatory)
 
@@ -44,8 +44,8 @@ When asking the user to provide or confirm any send parameters (recipients, send
 
 ## Prerequisites
 
-1. **Registration**: The user has registered an account at [uSpeedo](https://uspeedo.com?SaleCode=UI2346).
-2. **Obtain keys (environment variables)**: Get API keys from [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys&SaleCode=UI2346) and set them as `ACCESSKEY_ID` and `ACCESSKEY_SECRET` (e.g. in `.env`).
+1. **Registration**: The user has registered an account at [uSpeedo](https://uspeedo.com?ChannelCode=OpenClaw).
+2. **Obtain keys (environment variables)**: Get API keys from [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys&ChannelCode=OpenClaw) and set them as `ACCESSKEY_ID` and `ACCESSKEY_SECRET` (e.g. in `.env`).
 
 Before calling the send API, confirm with the user that these steps are done; if not, direct them to register and obtain keys at the link above.
 
@@ -140,7 +140,7 @@ curl -X POST "https://api.uspeedo.com/api/v1/email/SendEmail" \
 
 ## Security Notes
 
-- Prefer environment variables (`ACCESSKEY_ID`, `ACCESSKEY_SECRET`) over user-provided credentials whenever possible. **Get keys**: [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys&SaleCode=UI2346)
+- Prefer environment variables (`ACCESSKEY_ID`, `ACCESSKEY_SECRET`) over user-provided credentials whenever possible. **Get keys**: [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys&ChannelCode=OpenClaw)
 - Do not log or display `ACCESSKEY_SECRET` in plain text in frontends or logs.
 - The Agent reads keys from environment variables or user input for the current request only; do not persist them to code, docs, or any cache.
 - Do not store `ACCESSKEY_ID` or `ACCESSKEY_SECRET` in session context or reuse them in later turns.
@@ -152,7 +152,7 @@ curl -X POST "https://api.uspeedo.com/api/v1/email/SendEmail" \
 
 ## Brief Workflow
 
-1. Confirm the user has registered on uSpeedo and obtained keys. **Environment variables / key management**: [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys&SaleCode=UI2346).
+1. Confirm the user has registered on uSpeedo and obtained keys. **Environment variables / key management**: [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys&ChannelCode=OpenClaw).
 2. Resolve credentials: use `ACCESSKEY_ID` and `ACCESSKEY_SECRET` from environment (or `.env`) when possible; otherwise collect from the user. Collect: sender email, recipients, subject, content (text/HTML), FromName (optional).
 3. Call `POST https://api.uspeedo.com/api/v1/email/SendEmail` with Basic authentication.
 4. Report only the user-safe outcome to the user (see "Reporting API Response to the User" above); do not echo raw response bodies that may contain sensitive data.
