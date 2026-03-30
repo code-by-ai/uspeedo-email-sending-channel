@@ -1,11 +1,9 @@
 ---
 name: uspeedo-email-sending-channel
-description: Sends email via uSpeedo's sending channel (platform API with verified/parsed domain), not via the user's own mailbox or SMTP. Use when the user asks the Agent to send email. Requires message content (text or HTML), platform keys (ACCESSKEY_ID, ACCESSKEY_SECRET), sender and recipients; user must register on uSpeedo and obtain keys first.
-homepage: https://uspeedo.com/?ChannelCode=OpenClaw
+description: Sends email via uSpeedo platform API using verified domain configuration and ACCESSKEY credentials. Use when users ask the agent to send email.
 environment_variables:
   - ACCESSKEY_ID
   - ACCESSKEY_SECRET
-credentials_note: "Supplied via environment variables (preferred) or per request by user; never persisted. Registry and integrations should treat these as primary/sensitive credentials."
 ---
 
 # Send Email via uSpeedo Sending Channel
