@@ -1,6 +1,6 @@
 ---
 name: uspeedo-email-sending-channel
-description: Sends email via uSpeedo platform API using verified domain configuration and ACCESSKEY credentials. Use when users ask the agent to send email.
+description: Sends user-authorized transactional email via uSpeedo API with ACCESSKEY credentials from environment variables (preferred). Requires explicit confirmation of sender, recipients, subject, and content before sending.
 environment_variables:
   - ACCESSKEY_ID
   - ACCESSKEY_SECRET
@@ -32,6 +32,27 @@ environment_variables:
 ## Usage Restrictions (Mandatory)
 
 - **Do not cache or persist user-provided sensitive information**: `ACCESSKEY_ID` and `ACCESSKEY_SECRET` are for authenticating the current request only. They must not be written to session memory, knowledge base, cache, logs, code, or any storage that can be read later; after the call completes they are considered consumed and must not be retained or referenced.
+- **No hidden sending**: Never send email automatically. Always require an explicit user confirmation in the current turn for sender, recipients, subject, and final content.
+- **No credential echoing**: Never print, log, or repeat `Authorization` header, `ACCESSKEY_SECRET`, or full raw request/response payloads.
+- **Fail closed on missing credentials**: If environment variables are unavailable and user does not provide valid keys, stop and ask for required setup instead of attempting partial calls.
+
+## Mandatory Safety Gates Before Sending
+
+Run these checks before every send request:
+
+1. **Parameter confirmation gate (required)**:
+   - Confirm `SendEmail`, all `TargetEmailAddress`, `Subject`, and `Content` with the user in the same turn.
+   - If any required field is missing/ambiguous, stop and ask for correction.
+2. **Recipient format gate (required)**:
+   - Reject obviously invalid emails (missing `@`, missing domain, empty items, non-string entries).
+   - De-duplicate recipients before sending.
+3. **HTML safety gate (required for HTML content)**:
+   - If content is HTML, warn the user that active content is not allowed.
+   - Reject or require user rewrite when HTML contains risky patterns such as `<script`, `<iframe`, `<object`, `<embed`, `<form`, inline event handlers like `onload=`, or `javascript:` URLs.
+   - Prefer plain text when possible.
+4. **Scope gate (required)**:
+   - This skill is for user-requested transactional/notification sending via uSpeedo API only.
+   - If the user asks for deceptive, phishing, credential-harvesting, or policy-violating email, refuse to send.
 
 ## When to Use
 
@@ -80,6 +101,7 @@ Before calling the send API, confirm with the user that these steps are done; if
 ```
 
 - **Content**: Plain text or HTML. Use the user’s content as-is for plain text; use directly for HTML.
+- **Content safety**: For HTML, pass content only after the "HTML safety gate" above is satisfied.
 - **TargetEmailAddress**: Array with at least one recipient email.
 
 ## Example (JavaScript/Node)
@@ -142,6 +164,7 @@ curl -X POST "https://api.uspeedo.com/api/v1/email/SendEmail" \
 - Do not log or display `ACCESSKEY_SECRET` in plain text in frontends or logs.
 - The Agent reads keys from environment variables or user input for the current request only; do not persist them to code, docs, or any cache.
 - Do not store `ACCESSKEY_ID` or `ACCESSKEY_SECRET` in session context or reuse them in later turns.
+- Do not include credentials in examples that are rendered to end users except placeholder names.
 
 ## Reporting API Response to the User
 
@@ -151,9 +174,10 @@ curl -X POST "https://api.uspeedo.com/api/v1/email/SendEmail" \
 ## Brief Workflow
 
 1. Confirm the user has registered on uSpeedo and obtained keys. **Environment variables / key management**: [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys&ChannelCode=OpenClaw).
-2. Resolve credentials: use `ACCESSKEY_ID` and `ACCESSKEY_SECRET` from environment (or `.env`) when possible; otherwise collect from the user. Collect: sender email, recipients, subject, content (text/HTML), FromName (optional).
-3. Call `POST https://api.uspeedo.com/api/v1/email/SendEmail` with Basic authentication.
-4. Report only the user-safe outcome to the user (see "Reporting API Response to the User" above); do not echo raw response bodies that may contain sensitive data.
+2. Resolve credentials: use `ACCESSKEY_ID` and `ACCESSKEY_SECRET` from environment (or `.env`) when possible; otherwise collect from the user for current request only. Collect: sender email, recipients, subject, content (text/HTML), FromName (optional).
+3. Run all "Mandatory Safety Gates Before Sending" checks (confirmation, recipient format, HTML safety, scope).
+4. Call `POST https://api.uspeedo.com/api/v1/email/SendEmail` with Basic authentication.
+5. Report only the user-safe outcome to the user (see "Reporting API Response to the User" above); do not echo raw response bodies that may contain sensitive data.
 
 **When prompting the user to provide or confirm send parameters**, always include the guidance below (see "Notes for Users"). Show these hints every time you ask for recipient, sender, subject, content, or credentials.
 
