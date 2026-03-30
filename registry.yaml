@@ -1,6 +1,6 @@
 name: uspeedo-email-sending-channel
 description: Send email via the uSpeedo Email API using platform infrastructure rather than the user's mailbox or SMTP server.
-version: 1.0.3
+version: 1.0.7
 
 author:
   name: uSpeedo
