@@ -4,6 +4,14 @@ AI Skill for sending email through the uSpeedo Email API.
 
 This skill allows AI agents to send email using the uSpeedo platform rather than the user's personal mailbox.
 
+## Metadata (Packaging Consistency)
+
+- Homepage: https://uspeedo.com
+- Repository: https://github.com/code-by-ai/uspeedo-email-sending-channel
+- Source: https://clawhub.ai/code-by-ai/uspeedo-email-sending-channel
+- Required env vars: ACCESSKEY_ID, ACCESSKEY_SECRET
+- Primary credential: ACCESSKEY_SECRET
+
 ## Features
 
 - send transactional emails
