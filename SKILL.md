@@ -1,6 +1,6 @@
 ---
 name: uspeedo-email-sending-channel
-description: Sends user-authorized transactional email via uSpeedo API with ACCESSKEY credentials from environment variables (preferred). Requires explicit confirmation of sender, recipients, subject, and content before sending.
+description: Sends user-authorized transactional email via uSpeedo API with ACCESSKEY credentials (env preferred). Before SendEmail, calls GetSenderList to resolve SendEmail (default first enabled sender; user may override). Requires explicit confirmation of sender, recipients, subject, and content before sending.
 environment_variables:
   - ACCESSKEY_ID
   - ACCESSKEY_SECRET
@@ -41,7 +41,7 @@ environment_variables:
 Run these checks before every send request:
 
 1. **Parameter confirmation gate (required)**:
-   - Confirm `SendEmail`, all `TargetEmailAddress`, `Subject`, and `Content` with the user in the same turn.
+   - Resolve `SendEmail` first (see "Get Sender List and SendEmail resolution" below), then confirm `SendEmail`, all `TargetEmailAddress`, `Subject`, and `Content` with the user in the same turn.
    - If any required field is missing/ambiguous, stop and ask for correction.
 2. **Recipient format gate (required)**:
    - Reject obviously invalid emails (missing `@`, missing domain, empty items, non-string entries).
@@ -76,11 +76,43 @@ Before calling the send API, confirm with the user that these steps are done; if
 | ACCESSKEY_ID | Yes | Platform AccessKey ID (env or params) |
 | ACCESSKEY_SECRET | Yes | Platform AccessKey Secret (env or params) |
 | Recipients | Yes | One or more email addresses |
-| Sender email | Yes | SendEmail, e.g. sender@example.com |
+| Sender email (`SendEmail`) | Conditional | If the user does not specify: call **GetSenderList**, then use the first suitable sender’s `Email` (see resolution rules). The user may always provide or override `SendEmail` explicitly. |
 | Subject | Yes | Email subject |
 | Sender display name | No | FromName, e.g. "USpeedo" |
 
-## How to Call
+## Get Sender List and SendEmail resolution
+
+Official API reference: [GetSenderList](https://uspeedo.com/docs/products/email/api/GetSenderList).
+
+**When to call**: After credentials are available and **before** `SendEmail`, unless the user has already given a definitive `SendEmail` for this send (then you may skip the list call).
+
+**Endpoint**: `GET https://api.uspeedo.com/api/v1/email/GetSenderList`
+
+**Headers**:
+- `Accept: application/json`
+- `Authorization: Basic <base64(ACCESSKEY_ID:ACCESSKEY_SECRET)>`
+
+**Query string** (common defaults; all parameters are query-based per docs):
+- `Page=0` (page index starts at 0)
+- `NumPerPage=20` (max 200)
+- `OrderBy=create_time` or `update_time`
+- `OrderType=desc`
+
+Optional filters: `Email`, `Domain`, `SenderType`, `FuzzySearch` — use when the user wants a specific sender.
+
+**Response (user-safe handling)**:
+- On success, `RetCode` is `0`. Read `Data` (array of sender objects).
+- Each item includes at least: `Email`, `Status` (e.g. `1` enabled, `0` disabled), `Alias`, etc.
+
+**Default resolution for `SendEmail` (if user did not specify)**:
+1. If `Data` is empty or missing: stop; tell the user to add/enable a sender in the [Email console](https://console.uspeedo.com/email/setting?type=apiKeys&ChannelCode=OpenClaw) / domain & sender settings, or provide `SendEmail` explicitly.
+2. Prefer the **first** item in `Data` where `Status === 1` (enabled). If none, fall back to the **first** item in `Data` and warn that it may be disabled.
+3. Set `SendEmail` to that item’s `Email` string.
+4. **User override**: If the user supplies `SendEmail`, use it (after format validation). Optionally call `GetSenderList` with `Email` filter to verify it exists when helpful.
+
+**Confirmation**: Present the resolved `SendEmail` (and optionally `Alias` / domain from the same row) to the user with recipients, subject, and content before calling `SendEmail`.
+
+## How to Call SendEmail
 
 **Endpoint**: `POST https://api.uspeedo.com/api/v1/email/SendEmail`
 
@@ -106,28 +138,71 @@ Before calling the send API, confirm with the user that these steps are done; if
 
 ## Example (JavaScript/Node)
 
-Credentials are read from environment variables first; `params` is used as fallback.
+Credentials are read from environment variables first; `params` is used as fallback. Resolve `SendEmail` via **GetSenderList** when `sendEmail` is omitted.
 
 ```javascript
+function basicAuthHeader(accessKeyId, accessKeySecret) {
+  const token = Buffer.from(`${accessKeyId}:${accessKeySecret}`).toString('base64');
+  return `Basic ${token}`;
+}
+
+/** GET GetSenderList — see https://uspeedo.com/docs/products/email/api/GetSenderList */
+async function getSenderList(accessKeyId, accessKeySecret, query = {}) {
+  const qs = new URLSearchParams({
+    Page: '0',
+    NumPerPage: '20',
+    OrderBy: 'create_time',
+    OrderType: 'desc',
+    ...query
+  });
+  const url = `https://api.uspeedo.com/api/v1/email/GetSenderList?${qs}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: basicAuthHeader(accessKeyId, accessKeySecret)
+    }
+  });
+  return res.json();
+}
+
+function pickDefaultSendEmail(listResponse) {
+  const rows = listResponse?.Data;
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const enabled = rows.find((r) => r && r.Status === 1 && r.Email);
+  const first = rows.find((r) => r && r.Email);
+  return (enabled || first)?.Email ?? null;
+}
+
 async function sendEmailViaUSpeedo(params = {}) {
-  const accessKeyId =
-    process.env.ACCESSKEY_ID || params.accessKeyId;
-  const accessKeySecret =
-    process.env.ACCESSKEY_SECRET || params.accessKeySecret;
+  const accessKeyId = process.env.ACCESSKEY_ID || params.accessKeyId;
+  const accessKeySecret = process.env.ACCESSKEY_SECRET || params.accessKeySecret;
   const {
-    sendEmail,
+    sendEmail: userSendEmail,
     targetEmails,
     subject,
     content,
     fromName = ''
   } = params;
 
+  let sendEmail = userSendEmail;
+  if (!sendEmail) {
+    const listJson = await getSenderList(accessKeyId, accessKeySecret);
+    if (listJson?.RetCode !== 0) {
+      return { error: 'GetSenderList failed', detail: listJson };
+    }
+    sendEmail = pickDefaultSendEmail(listJson);
+    if (!sendEmail) {
+      return { error: 'No sender in GetSenderList; add a sender in console or pass sendEmail' };
+    }
+  }
+
   const auth = Buffer.from(`${accessKeyId}:${accessKeySecret}`).toString('base64');
   const res = await fetch('https://api.uspeedo.com/api/v1/email/SendEmail', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Basic ${auth}`
+      Authorization: `Basic ${auth}`
     },
     body: JSON.stringify({
       SendEmail: sendEmail,
@@ -144,6 +219,18 @@ async function sendEmailViaUSpeedo(params = {}) {
 ## Example (curl)
 
 Use environment variables `ACCESSKEY_ID` and `ACCESSKEY_SECRET` (e.g. from `.env` or export). If unset, replace with your keys for testing only.
+
+**List senders (before send)** — [GetSenderList](https://uspeedo.com/docs/products/email/api/GetSenderList):
+
+```bash
+curl -s -X GET "https://api.uspeedo.com/api/v1/email/GetSenderList?Page=0&NumPerPage=20&OrderBy=create_time&OrderType=desc" \
+  -H "Accept: application/json" \
+  -H "Authorization: Basic $(echo -n "${ACCESSKEY_ID}:${ACCESSKEY_SECRET}" | base64)"
+```
+
+Parse `Data[0].Email` (or first `Status`-enabled row) for `SendEmail`, unless the user sets `SendEmail` manually.
+
+**Send email**:
 
 ```bash
 curl -X POST "https://api.uspeedo.com/api/v1/email/SendEmail" \
@@ -174,14 +261,17 @@ curl -X POST "https://api.uspeedo.com/api/v1/email/SendEmail" \
 ## Brief Workflow
 
 1. Confirm the user has registered on uSpeedo and obtained keys. **Environment variables / key management**: [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys&ChannelCode=OpenClaw).
-2. Resolve credentials: use `ACCESSKEY_ID` and `ACCESSKEY_SECRET` from environment (or `.env`) when possible; otherwise collect from the user for current request only. Collect: sender email, recipients, subject, content (text/HTML), FromName (optional).
-3. Run all "Mandatory Safety Gates Before Sending" checks (confirmation, recipient format, HTML safety, scope).
-4. Call `POST https://api.uspeedo.com/api/v1/email/SendEmail` with Basic authentication.
-5. Report only the user-safe outcome to the user (see "Reporting API Response to the User" above); do not echo raw response bodies that may contain sensitive data.
+2. Resolve credentials: use `ACCESSKEY_ID` and `ACCESSKEY_SECRET` from environment (or `.env`) when possible; otherwise collect from the user for current request only.
+3. **Resolve `SendEmail`**: If the user provided a sender address, validate format and use it. If not, call `GET .../GetSenderList`, apply the default resolution (first enabled sender’s `Email`, else first row), or stop if the list is empty.
+4. Collect or confirm: recipients, subject, content (text/HTML), FromName (optional). Always confirm the final `SendEmail` with the user if it came from the list.
+5. Run all "Mandatory Safety Gates Before Sending" checks (confirmation, recipient format, HTML safety, scope).
+6. Call `POST https://api.uspeedo.com/api/v1/email/SendEmail` with Basic authentication.
+7. Report only the user-safe outcome to the user (see "Reporting API Response to the User" above); do not echo raw response bodies that may contain sensitive data.
 
 **When prompting the user to provide or confirm send parameters**, always include the guidance below (see "Notes for Users"). Show these hints every time you ask for recipient, sender, subject, content, or credentials.
 
 ## Notes for Users
 
 - **ACCESSKEY_ID and ACCESSKEY_SECRET**: Obtain from [Email API Key management](https://console.uspeedo.com/email/setting?type=apiKeys).
+- **Sender address (`SendEmail`)**: If you do not specify a sender, the skill uses [GetSenderList](https://uspeedo.com/docs/products/email/api/GetSenderList) to pick a default (first enabled sender). You can always set `SendEmail` yourself.
 - **Deliverability**: For better sending results, configure your own sending domain: [Domain setting](https://console.uspeedo.com/email/setting?type=domain).
